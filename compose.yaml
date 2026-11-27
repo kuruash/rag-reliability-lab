@@ -1,0 +1,86 @@
+name: rag-reliability-lab
+
+services:
+  postgres:
+    image: postgres:17.6
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${RAG_LAB_POSTGRES_DB:-rag_lab}
+      POSTGRES_USER: ${RAG_LAB_POSTGRES_USER:-rag_lab}
+      POSTGRES_PASSWORD: ${RAG_LAB_POSTGRES_PASSWORD:-rag_lab_dev}
+    ports:
+      - "127.0.0.1:${RAG_LAB_POSTGRES_HOST_PORT:-55433}:5432"
+    volumes:
+      - rag_lab_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - rag_lab
+
+  qdrant:
+    image: qdrant/qdrant:v1.14.1
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${RAG_LAB_QDRANT_HTTP_PORT:-6333}:6333"
+      - "127.0.0.1:${RAG_LAB_QDRANT_GRPC_PORT:-6334}:6334"
+    volumes:
+      - rag_lab_qdrant_data:/qdrant/storage
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333'",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - rag_lab
+
+  minio:
+    # MinIO RELEASE.2025-09-07T16-13-09Z, pinned by digest for reproducibility.
+    image: quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${RAG_LAB_MINIO_ROOT_USER:-rag_lab_minio}
+      MINIO_ROOT_PASSWORD: ${RAG_LAB_MINIO_ROOT_PASSWORD:-rag_lab_minio_dev}
+    command: server /data --console-address ":9001"
+    ports:
+      - "127.0.0.1:${RAG_LAB_MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${RAG_LAB_MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - rag_lab_minio_data:/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:9000/minio/health/live >/dev/null",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - rag_lab
+
+volumes:
+  rag_lab_postgres_data:
+    name: ${RAG_LAB_POSTGRES_VOLUME:-rag_lab_postgres_data}
+  rag_lab_qdrant_data:
+    name: ${RAG_LAB_QDRANT_VOLUME:-rag_lab_qdrant_data}
+  rag_lab_minio_data:
+    name: ${RAG_LAB_MINIO_VOLUME:-rag_lab_minio_data}
+
+networks:
+  rag_lab:
+    name: rag_lab_network
+
