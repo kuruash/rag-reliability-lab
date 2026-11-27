@@ -47,8 +47,8 @@ services:
       - rag_lab
 
   minio:
-    # MinIO RELEASE.2025-09-07T16-13-09Z, pinned by digest for reproducibility.
-    image: quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    # Pigsty Silo, MinIO-compatible fork, pinned by multi-arch digest.
+    image: docker.io/pgsty/silo@sha256:c20d112390b9a9ce8c11b8af95ad35bcaa62f4759663c09c936cd8d2b511f329
     restart: unless-stopped
     environment:
       MINIO_ROOT_USER: ${RAG_LAB_MINIO_ROOT_USER:-rag_lab_minio}

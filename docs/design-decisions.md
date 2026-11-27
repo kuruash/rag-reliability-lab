@@ -233,6 +233,37 @@ Do not extract a standalone reliability-testing framework until experiments demo
 
 **Reasoning:** Premature abstraction would increase development cost before the useful general-purpose interfaces are understood.
 
+## ADR-015 — Silo image for local S3-compatible object storage
+
+**Status:** Accepted
+
+**Decision:** Use the publicly pullable, digest-pinned `docker.io/pgsty/silo`
+standard image for the local and CI object-storage service. Silo is a
+Pigsty-maintained MinIO-compatible fork.
+
+**Reasoning:** The previously pinned `quay.io/minio/minio` image returned
+`401 UNAUTHORIZED` during fresh CI pulls. Silo publishes a public multi-
+architecture image for Linux amd64 and arm64, preserves the S3 API,
+`MINIO_*` environment variables, `/minio/*` health routes, and the MinIO
+on-disk format, and is therefore compatible with the existing Compose service
+and boto3 integration tests. The image is pinned to an immutable manifest
+digest for reproducibility.
+
+**Provenance and license:** Silo is maintained in the public
+[`pgsty/silo`](https://github.com/pgsty/silo) repository and distributed under
+AGPLv3. Its published compliance materials preserve MinIO attribution and
+third-party notices. Review AGPLv3 obligations before using this runtime in a
+public or production deployment.
+
+**Tradeoff:** Silo is not an official MinIO image. It is a downstream fork,
+so future compatibility and security updates must be reviewed when the pinned
+digest is intentionally advanced. Existing local data is retained, but a
+volume migration or rollback must be tested before production use.
+
+**Reconsider if:** The project requires official MinIO support, a different
+license, or an object-storage service with a separate support and upgrade
+policy.
+
 ## Open design questions
 
 The following decisions are not yet finalized:
