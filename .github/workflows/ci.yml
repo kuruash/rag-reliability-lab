@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  RAG_LAB_POSTGRES_DB: rag_lab
+  RAG_LAB_POSTGRES_USER: rag_lab
+  RAG_LAB_POSTGRES_PASSWORD: rag_lab_ci
+  RAG_LAB_POSTGRES_HOST_PORT: 55433
+  RAG_LAB_DATABASE_URL: postgresql+psycopg://rag_lab:rag_lab_ci@localhost:55433/rag_lab
+  RAG_LAB_TEST_DATABASE_URL: postgresql+psycopg://rag_lab:rag_lab_ci@localhost:55433/rag_lab_test
+  RAG_LAB_QDRANT_HTTP_PORT: 6333
+  RAG_LAB_QDRANT_GRPC_PORT: 6334
+  RAG_LAB_QDRANT_URL: http://localhost:6333
+  RAG_LAB_MINIO_ROOT_USER: rag_lab_minio
+  RAG_LAB_MINIO_ROOT_PASSWORD: rag_lab_minio_ci
+  RAG_LAB_MINIO_API_PORT: 9000
+  RAG_LAB_MINIO_CONSOLE_PORT: 9001
+  RAG_LAB_MINIO_ENDPOINT: http://localhost:9000
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Set up dependencies and services
+        run: make -e setup
+
+      - name: Run Ruff lint
+        run: make -e lint
+
+      - name: Check Ruff formatting
+        run: make -e format-check
+
+      - name: Run complete test suite
+        run: make -e test
+
+      - name: Collect service logs on failure
+        if: ${{ failure() }}
+        run: docker compose logs --no-color
+
+      - name: Stop Compose services
+        if: ${{ always() }}
+        run: docker compose down
+

@@ -127,44 +127,117 @@ This will establish a functioning document RAG application before introducing as
 ## Getting Started
 
 Phase 1 currently provides the Python package, the liveness endpoint, the
-PostgreSQL lifecycle schema, and the initial migration.
+PostgreSQL lifecycle schema, the initial migration, and local PostgreSQL,
+Qdrant, and MinIO-compatible infrastructure.
 
 Prerequisites:
 
 - Python 3.12
-- PostgreSQL 15 or newer
+- Docker Desktop or Docker Engine with Compose
 
-Create an environment and install the development dependencies:
-
-```bash
-python3.12 -m venv .venv
-.venv/bin/python -m pip install -e '.[dev]'
-```
-
-Set `RAG_LAB_DATABASE_URL` for the application and Alembic, then apply the
-migration:
+The reproducible setup command creates a Python 3.12 virtual environment,
+installs development dependencies, starts Compose, provisions the separate
+integration-test database, and applies migrations to both databases:
 
 ```bash
-export RAG_LAB_DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/rag_lab
-.venv/bin/alembic upgrade head
+make setup
 ```
 
-Run the liveness test and lint checks:
+To customize local credentials or ports, copy `.env.example` to `.env` and
+edit it before running `make setup`. The example contains development-only
+defaults and no production credentials.
+
+The local infrastructure contains these services:
+
+| Service | Purpose | Host ports |
+|---|---|---|
+| PostgreSQL 17 | Authoritative document lifecycle state | `127.0.0.1:55433` |
+| Qdrant | Derived vector index | `127.0.0.1:6333` HTTP, `127.0.0.1:6334` gRPC |
+| MinIO-compatible object storage | Original document versions | `127.0.0.1:9000` API, `127.0.0.1:9001` console |
+
+The Compose file binds services to localhost only. PostgreSQL uses host port
+`55433` so it does not conflict with an existing PostgreSQL server on `5432`.
+
+Start only the infrastructure:
 
 ```bash
-.venv/bin/pytest tests/unit
-.venv/bin/ruff check .
+docker compose up -d
+docker compose ps
 ```
 
-PostgreSQL integration tests require a separate disposable database URL:
+Check service logs or health status:
 
 ```bash
-export RAG_LAB_TEST_DATABASE_URL="$RAG_LAB_DATABASE_URL"
-.venv/bin/pytest tests/integration
+docker compose logs -f postgres
+docker inspect --format '{{.Name}} {{.State.Health.Status}}' \
+  $(docker compose ps -q postgres) \
+  $(docker compose ps -q qdrant) \
+  $(docker compose ps -q minio)
 ```
 
-Document ingestion, retrieval, vector storage, asynchronous workers, and the
-frontend are intentionally not part of this Phase 1 step.
+The named volumes `rag_lab_postgres_data`, `rag_lab_qdrant_data`, and
+`rag_lab_minio_data` preserve data across `docker compose stop`, `docker
+compose down`, and container restarts. Do not use `docker compose down -v`
+unless you intentionally want to remove these local data volumes.
+
+The example environment configures `RAG_LAB_DATABASE_URL` for `rag_lab` and
+`RAG_LAB_TEST_DATABASE_URL` for `rag_lab_test`. Integration tests verify that
+these URLs target different databases and apply the Alembic migrations to the
+test database before running schema checks. `make setup` creates
+`rag_lab_test` only when it does not already exist.
+
+The FastAPI application and Alembic use `RAG_LAB_DATABASE_URL` from `.env`:
+`postgresql+psycopg://rag_lab:rag_lab_dev@localhost:55433/rag_lab`. From a
+future container on the Compose network, the equivalent PostgreSQL URL would
+use `postgres:5432` instead of `localhost:55433`.
+
+Qdrant and MinIO connectivity settings are also supplied through `.env`.
+Qdrant uses `RAG_LAB_QDRANT_URL` and an optional API key. MinIO uses
+`RAG_LAB_MINIO_ENDPOINT`, `RAG_LAB_MINIO_ROOT_USER`, and
+`RAG_LAB_MINIO_ROOT_PASSWORD` for this local development environment.
+
+Run the complete test suite, including PostgreSQL, Qdrant, and MinIO integration
+tests:
+
+```bash
+make test
+```
+
+`make test` fails if any test is skipped. Run the quality checks directly with:
+
+```bash
+make lint
+make format-check
+```
+
+Run the FastAPI development server with Compose services available:
+
+```bash
+make dev
+```
+
+The external-storage integration tests list Qdrant collections and create a
+unique temporary MinIO bucket. They upload, read, and delete one object, then
+remove the bucket, so they do not use development buckets or collections.
+
+Stop services while retaining their data:
+
+```bash
+docker compose stop
+```
+
+Stop and remove the containers and network while retaining named volumes:
+
+```bash
+docker compose down
+```
+
+Document ingestion, retrieval, asynchronous workers, Redis, and the frontend
+are intentionally not part of this Phase 1 step.
+
+GitHub Actions runs the same setup, lint, formatting, and test commands on
+pull requests and pushes to `main`. CI uses disposable development credentials
+and fresh service containers; it does not use local Docker volumes.
 
 ## Documentation
 
