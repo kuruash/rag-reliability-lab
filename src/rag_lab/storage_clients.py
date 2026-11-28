@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import boto3
 from botocore.client import BaseClient
 from botocore.config import Config as BotoConfig
+from botocore.exceptions import ClientError
 from qdrant_client import QdrantClient
 
 from rag_lab.config import Settings, settings
@@ -78,3 +79,23 @@ def list_minio_buckets(client: BaseClient) -> list[str]:
         raise StorageConnectionError(
             "MinIO connection failed; check the endpoint and RAG_LAB_MINIO credentials"
         ) from exc
+
+
+def ensure_minio_bucket(client: BaseClient, bucket_name: str) -> None:
+    """Ensure the configured bucket exists without replacing an existing bucket."""
+    try:
+        client.head_bucket(Bucket=bucket_name)
+        return
+    except ClientError as exc:
+        error_code = exc.response.get("Error", {}).get("Code")
+        if error_code not in {"404", "NoSuchBucket", "NotFound"}:
+            raise StorageConnectionError(
+                "MinIO bucket check failed; check the endpoint and credentials"
+            ) from exc
+
+    try:
+        client.create_bucket(Bucket=bucket_name)
+    except ClientError as exc:
+        error_code = exc.response.get("Error", {}).get("Code")
+        if error_code not in {"BucketAlreadyExists", "BucketAlreadyOwnedByYou"}:
+            raise StorageConnectionError("MinIO bucket creation failed") from exc
