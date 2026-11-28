@@ -12,8 +12,10 @@ class Settings(BaseSettings):
     minio_endpoint: str = "http://localhost:9000"
     minio_root_user: str = "rag_lab_minio"
     minio_root_password: str = "rag_lab_minio_dev"
+    minio_bucket: str = "rag-lab-documents"
     minio_secure: bool = False
     minio_region: str = "us-east-1"
+    max_upload_size_bytes: int = 10 * 1024 * 1024
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="RAG_LAB_", extra="ignore")
 

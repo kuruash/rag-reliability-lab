@@ -220,6 +220,20 @@ The external-storage integration tests list Qdrant collections and create a
 unique temporary MinIO bucket. They upload, read, and delete one object, then
 remove the bucket, so they do not use development buckets or collections.
 
+The Phase 2 storage-only upload endpoint accepts a PDF as multipart form data:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/documents \
+  -F 'file=@example.pdf;type=application/pdf'
+```
+
+It returns `201 Created` with `document_id`, `version`, and `status: "pending"`.
+The original bytes are stored in the configured MinIO bucket and the matching
+PostgreSQL document/version rows are created with `active_version` unset. This
+step does not start ingestion and does not return a job ID; asynchronous
+processing is deferred to Phase 3. The development endpoint uses the seeded
+local tenant identity and ignores client-supplied tenant IDs.
+
 Stop services while retaining their data:
 
 ```bash

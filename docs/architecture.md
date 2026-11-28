@@ -115,6 +115,11 @@ Fault injection must remain isolated from normal application behavior.
 
 An uploaded document is not assumed to be immediately searchable.
 
+The Phase 2 storage-only upload slice stores the validated PDF and commits a
+pending version with `desired_version = 1` and no active version. It returns
+HTTP 201 with the document ID, version, and pending status; it does not create
+an ingestion job. The outbox event and HTTP 202 job contract begin in Phase 3.
+
 Once asynchronous ingestion is implemented, uploads and updates return HTTP 202 with an ingestion job ID.
 
 ### Transactional outbox
@@ -244,7 +249,15 @@ Deletion distinguishes immediate logical revocation from eventual physical clean
 
 The experiment runner is a separate CLI, not a public API.
 
-Request schemas, error contracts, pagination, concurrency preconditions, and exact deletion semantics will be finalized during implementation.
+The current upload contract is `POST /api/v1/documents` with one
+`multipart/form-data` field named `file`. The field must have content type
+`application/pdf`, begin with the PDF signature, and fit the configured size
+limit. Success returns HTTP 201 with `{document_id, version, status}` where
+`status` is `pending`; invalid input returns HTTP 400 or 413, a duplicate
+tenant-scoped filename returns HTTP 409, and storage failure returns HTTP 502.
+The endpoint uses the seeded development identity until authentication is
+implemented. Other request schemas, pagination, concurrency preconditions, and
+exact deletion semantics will be finalized during implementation.
 
 ## 9. Reliability invariants
 
