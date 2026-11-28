@@ -1,3 +1,4 @@
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,6 +17,16 @@ class Settings(BaseSettings):
     minio_secure: bool = False
     minio_region: str = "us-east-1"
     max_upload_size_bytes: int = 10 * 1024 * 1024
+    chunk_size: int = 1000
+    chunk_overlap: int = 100
+
+    @model_validator(mode="after")
+    def validate_chunking_configuration(self) -> "Settings":
+        if self.chunk_size <= 0:
+            raise ValueError("chunk_size must be greater than zero")
+        if self.chunk_overlap < 0 or self.chunk_overlap >= self.chunk_size:
+            raise ValueError("chunk_overlap must be at least zero and less than chunk_size")
+        return self
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="RAG_LAB_", extra="ignore")
 
