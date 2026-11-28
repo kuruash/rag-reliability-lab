@@ -234,6 +234,19 @@ step does not start ingestion and does not return a job ID; asynchronous
 processing is deferred to Phase 3. The development endpoint uses the seeded
 local tenant identity and ignores client-supplied tenant IDs.
 
+Phase 2 Step 2 provides pure PDF parsing and text chunking helpers for the
+future ingestion worker. Parsing uses `pypdf` and returns one immutable record
+per page with a one-based page number. Chunking normalizes whitespace and uses
+Unicode character counts, not tokens or bytes. `RAG_LAB_CHUNK_SIZE` defaults to
+1000 characters and `RAG_LAB_CHUNK_OVERLAP` defaults to 100 characters; overlap
+must be non-negative and smaller than the chunk size. Chunks retain document
+ID, version, page number, and a deterministic zero-based document chunk index.
+
+Malformed, empty, encrypted, and image-only PDFs are rejected explicitly.
+Image-only PDFs are not OCR'd in this milestone, and pages with no text inside
+an otherwise text-bearing PDF produce no chunks. Parsing and chunking do not
+change document status or publish versions.
+
 Stop services while retaining their data:
 
 ```bash
